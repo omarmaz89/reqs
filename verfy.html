@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Verify</title>
+
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js"></script>
+</head>
+<body>
+
+<h2>Verifying...</h2>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "YOUR_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+
+  window.onload = () => {
+    const url = window.location.href;
+
+    if (auth.isSignInWithEmailLink(url)) {
+      let email = localStorage.getItem("emailForSignIn");
+
+      if (!email) {
+        email = prompt("Enter your email to confirm:");
+      }
+
+      auth.signInWithEmailLink(email, url)
+        .then((result) => {
+          localStorage.removeItem("emailForSignIn");
+          alert("Email verified: " + result.user.email);
+        })
+        .catch(err => console.error(err));
+    }
+  };
+</script>
+
+</body>
+</html>
