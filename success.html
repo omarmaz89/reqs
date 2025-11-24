@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Verify Email</title>
+<title>Google Login Success</title>
 </head>
 <body>
-<h2>Verifying...</h2>
+<h2>Logging in...</h2>
 
 <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
 <script type="module">
@@ -16,9 +16,10 @@ const client = new Appwrite.Client()
 
 const account = new Appwrite.Account(client);
 
+// After Google redirects here, check session
 account.get()
     .then(user => {
-        console.log("Magic login success:", user);
+        console.log("Google login success:", user);
         window.location.href = "index.html"; // redirect to homepage
     })
     .catch(err => {

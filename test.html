@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appwrite Google Login</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #f2f2f2;
+    }
+    .card {
+      background: #fff;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    button {
+      background: #4285F4;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #3367D6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Sign in with Google</h2>
+    <button id="loginBtn">Login with Google</button>
+  </div>
+
+  <!-- Working Appwrite Browser SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
+
+  <script>
+    const client = new Appwrite.Client()
+      .setEndpoint("https://fra.cloud.appwrite.io/v1")
+      .setProject("69245280003e7f885796");
+
+    const account = new Appwrite.Account(client);
+
+    document.getElementById("loginBtn").addEventListener("click", () => {
+      account.createOAuth2Session(
+        "google",
+        window.location.origin + "/success.html",
+        window.location.origin + "/failed.html"
+      );
+    });
+  </script>
+
+</body>
+</html>
