@@ -1,32 +1,211 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="mstyle.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard - App</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+<link rel="stylesheet" href="mstyle.css">
 </head>
 <body>
-    <header>
-        <h1>Dashboard</h1>
-        <a href="account.html" class="account-icon" title="Account">
-            <i class="fa-solid fa-user"></i>
-        </a>
-    </header>
 
-    <main>
-        <div class="buttons">
-            <a href="request.html" class="btn">Request</a>
-            <a href="price.html" class="btn">Price</a>
-        </div>
+<header>
+  <h1>Dashboard</h1>
+  <button id="signoutBtn">Sign Out</button>
+</header>
 
-        <section class="pending-requests">
-            <h2>Pending Requests</h2>
-            <ul id="requests-list">
-                <li>No pending requests</li>
-            </ul>
-        </section>
-    </main>
+<main>
+  <div class="welcome">
+    <h2 id="status">Checking authentication...</h2>
+  </div>
+
+  <div class="submit-request">
+    <h2>Submit a Request</h2>
+    <input type="text" id="reqName" placeholder="Your Name">
+    <input type="text" id="reqPhone" placeholder="Phone Number">
+    <input type="text" id="reqAddress" placeholder="Address">
+    <textarea id="reqDesc" placeholder="Description"></textarea>
+    <button id="submitReq">Submit Request</button>
+  </div>
+
+  <div class="requests-container">
+    <div class="request-column">
+      <h3>Pending</h3>
+      <ul id="pendingReqs"></ul>
+    </div>
+    <div class="request-column">
+      <h3>In Progress</h3>
+      <ul id="inProgressReqs"></ul>
+    </div>
+    <div class="request-column">
+      <h3>Done</h3>
+      <ul id="doneReqs"></ul>
+    </div>
+      <div class="request-column">
+    <h3>Rejected</h3>
+    <ul id="rejectedReqs"></ul>
+  </div>
+  </div>
+</main>
+
+<footer>
+  &copy; 2025 My App
+</footer>
+
+<script type="module">
+const client = new Appwrite.Client()
+    .setEndpoint("https://fra.cloud.appwrite.io/v1")
+    .setProject("69245280003e7f885796");
+
+const account = new Appwrite.Account(client);
+const status = document.getElementById("status");
+
+async function authCheck() {
+    try {
+        const user = await account.get();
+        console.log("User logged in:", user);
+        status.innerText = `Welcome, ${user.name || user.email}!`;
+    } catch (err) {
+        console.log("No active session:", err);
+        window.location.href = "/signup.html";
+    }
+}
+
+authCheck();
+
+// Sign out button
+document.getElementById("signoutBtn").onclick = async () => {
+    try {
+        await account.deleteSession('current');
+        status.innerText = "Signed out successfully!";
+        setTimeout(() => window.location.href = "/signup.html", 1000);
+    } catch (err) {
+        console.error(err);
+        status.innerText = "Error signing out.";
+    }
+};
+    const databases = new Appwrite.Databases(client);
+
+
+
+async function loadRequests() {
+    const pending = document.getElementById("pendingReqs");
+    const inProgress = document.getElementById("inProgressReqs");
+    const done = document.getElementById("doneReqs");
+    const rejected = document.getElementById("rejectedReqs");
+
+    pending.innerHTML = "";
+    inProgress.innerHTML = "";
+    done.innerHTML = "";
+    rejected.innerHTML = "";
+
+    try {
+        const result = await databases.listDocuments(
+            '6925b17c003e4e83b77b', // Database ID
+            'requests',             // Collection/Table ID
+            [],                     // Filters (optional)
+            100                     // Limit
+        );
+
+        if (result.documents.length === 0) {
+            pending.innerHTML = "<li>No requests found.</li>";
+            return;
+        }
+
+        result.documents.forEach(doc => {
+            const li = document.createElement("li");
+            li.innerHTML = `
+                <span><strong>Name:</strong> ${doc.name}</span>
+                <span><strong>Phone:</strong> ${doc.phoneNumber}</span>
+                <span><strong>Address:</strong> ${doc.address}</span>
+                <span><strong>Description:</strong> ${doc.des}</span>
+            `;
+
+            if (doc.status === "pending") pending.appendChild(li);
+            else if (doc.status === "in progress") inProgress.appendChild(li);
+            else if (doc.status === "done") done.appendChild(li);
+            else if (doc.status === "rejected") rejected.appendChild(li);
+        });
+    } catch (err) {
+        console.error("Error loading requests:", err);
+    }
+}
+
+function renderRequests(documents) {
+    const pending = document.getElementById("pendingReqs");
+    const inProgress = document.getElementById("inProgressReqs");
+    const done = document.getElementById("doneReqs");
+    const rejected = document.getElementById("rejectedReqs");
+
+    pending.innerHTML = "";
+    inProgress.innerHTML = "";
+    done.innerHTML = "";
+    rejected.innerHTML = "";
+
+    documents.forEach(doc => {
+        const li = document.createElement("li");
+        li.textContent = `${doc.name} | ${doc.phoneNumber} | ${doc.address} | ${doc.des}`;
+
+        li.onclick = () => {
+            if (doc.status === "pending") doc.status = "in progress";
+            else if (doc.status === "in progress") doc.status = "done";
+            else if (doc.status === "done") doc.status = "rejected"; // optional cycle
+            renderRequests(documents);
+        };
+
+        if (doc.status === "pending") pending.appendChild(li);
+        else if (doc.status === "in progress") inProgress.appendChild(li);
+        else if (doc.status === "done") done.appendChild(li);
+        else if (doc.status === "rejected") rejected.appendChild(li);
+    });
+}
+
+
+
+loadRequests();
+
+
+document.getElementById("submitReq").onclick =async function() {
+    // Read input values inside the click handler
+    const Name = document.getElementById("reqName").value;
+    const phone = document.getElementById("reqPhone").value;
+    const Address = document.getElementById("reqAddress").value;
+    const desc = document.getElementById("reqDesc").value;
+    
+    // Optional: validate values before sending
+    if (!Name || !phone || !Address || !desc) {
+      alert("Please fill all fields");
+      return;
+    }
+const user = await account.get();
+    // Create the document in Appwrite
+databases.createDocument(
+  '6925b17c003e4e83b77b', // Database ID
+  'requests',             // Collection/Table ID
+  Appwrite.ID.unique(),   // Document ID
+  { name: Name, phoneNumber: phone, address: Address, des: desc ,status: "pending",}, // Data
+  [
+    Appwrite.Permission.read(`user:${user.$id}`),
+    Appwrite.Permission.update(`user:${user.$id}`),
+    Appwrite.Permission.delete(`user:${user.$id}`)
+  ]
+)
+    .then(function(response) {
+      console.log("Document created:", response);
+      alert("Request submitted successfully!");
+      // Optional: clear inputs
+      document.getElementById("reqName").value = "";
+      document.getElementById("reqPhone").value = "";
+      document.getElementById("reqAddress").value = "";
+      document.getElementById("reqDesc").value = "";
+    })
+    .catch(function(error) {
+      console.error("Error creating document:", error);
+      alert("Error submitting request. Check console.");
+    });
+  };
+
+</script>
+
 </body>
 </html>

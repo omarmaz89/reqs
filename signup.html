@@ -1,105 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Up / Sign In</title>
+<link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
-
 </head>
 <body>
-    <div id="cont">
-        <h1 id="title">Create Account</h1>
-        <p class="subtitle">Sign up to get started</p>
-        
-        <!-- Email Input -->
-        <div class="input-group">
-            <label for="email-input">Email</label>
-            <input type="email" id="email-input" placeholder="name@example.com">
-            <span class="error-msg" id="email-error"></span>
-        </div>
-        
+<div id="cont">
+    <h1>Create / Access Account</h1>
+    <p>Sign up or sign in using your email</p>
 
-
-        <button class="submit-btn" id="submit">Continue</button>
-
-        <div class="divider"><span>OR</span></div>
-
-        <!-- Google Sign-In -->
-        <button class="google-btn" id="gs">
-            <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo">
-            Sign in with Google
-        </button>
-
-        <p class="footer-text">
-            Already have an account? <a href="signin.html">Sign in</a>
-        </p>
+    <div class="input-group">
+        <label for="email-input">Email</label>
+        <input type="email" id="email-input" placeholder="name@example.com">
+        <span class="error-msg" id="email-error"></span>
     </div>
 
-    <script src="script.js"></script>
-
+    <button id="submit" class="submit-btn">Continue</button>
+    <p id="status"></p>
+</div>
 
 <script type="module">
-  
   // Initialize Appwrite client
   const client = new Appwrite.Client()
-    .setEndpoint("https://fra.cloud.appwrite.io/v1") // Appwrite endpoint
-    .setProject("69245280003e7f885796");             // Your project ID
+    .setEndpoint("https://fra.cloud.appwrite.io/v1") // Replace with your endpoint
+    .setProject("69245280003e7f885796");            // Replace with your project ID
 
   const account = new Appwrite.Account(client);
-
   const emailInput = document.getElementById("email-input");
-  const signinBtn = document.getElementById('submit');
-  const gs = document.getElementById('gs');
+  const submitBtn = document.getElementById("submit");
+  const status = document.getElementById("status");
 
-async function checkAuthStatus() {
+  // ------------------------------
+  // Check if user is already logged in
+  // ------------------------------
+  async function authCheck() {
     try {
-        // If successful, user is authenticated
-        const user = await account.get();
-        console.log("User is authenticated:", user);
-        // Proceed with your authenticated app flow
-        return user;
-    } catch (error) {
-        console.error("User is not authenticated:", error);
-        // Redirect to login page or show login UI
-        // window.location.href = '/login';
-        return null;
+      const user = await account.get();
+      if (!user.emailVerification) {
+        status.innerText = "Please verify your email first.";
+        return;
+      }
+      // Already logged in → redirect
+      window.location.href = "/index.html";
+    } catch {
+      console.log("No active session");
+      handleMagicLink();
     }
-}
+  }
 
-// Call this function when your app initializes
-checkAuthStatus();
+  // ------------------------------
+  // Handle magic link login
+  // ------------------------------
+  async function handleMagicLink() {
+    const params = new URLSearchParams(window.location.search);
+    const userId = params.get('userId');
+    const secret = params.get('secret');
 
-  // -------------------------
-  // Email link login
-  // -------------------------
-  signinBtn.onclick = function() {
-    const email = emailInput.value;
-    account.createMagicURLSession(
-      email,
-      window.location.origin + '/verify.html' // redirect after login
-    ).then(response => {
-      console.log("Magic login link sent to " + email);
-      localStorage.setItem('emailForSignIn', email);
-    }).catch(error => {
-      console.error("Error sending magic link:", error);
-    });
-  };
+    if (userId && secret) {
+      try {
+        await account.deleteSession('current').catch(() => {});
+        await account.updateMagicURLSession(userId, secret);
 
-  // -------------------------
-  // Google OAuth login
-  // -------------------------
-  gs.onclick = function() {
-    account.createOAuth2Session(
-      'google',
-      window.location.origin, // just redirect to current page
-      window.location.origin  // just redirect to current page
-    ).catch(error => {
-      console.error("Google OAuth error:", error);
-    });
+        const user = await account.get();
+        if (!user.emailVerification) {
+          status.innerText = "Verify your email to continue.";
+          return;
+        }
+
+        window.history.replaceState({}, document.title, window.location.pathname);
+        window.location.href = "/index.html";
+
+      } catch (err) {
+        console.error("Magic link login failed:", err);
+        status.innerText = "Magic link login failed.";
+      }
+    }
+  }
+
+  authCheck();
+
+  // ------------------------------
+  // Send Magic Link (Appwrite v17)
+  // ------------------------------
+  submitBtn.onclick = async () => {
+    const email = emailInput.value.trim();
+    if (!email) return alert("Enter your email!");
+
+    try {
+      await account.createMagicURLToken(
+        Appwrite.ID.unique(),  // token ID
+        email,                 // email
+        window.location.href   // redirect URL
+      );
+      status.innerText = "Magic link sent! Check your email to continue.";
+    } catch (err) {
+      console.error(err);
+      status.innerText = "Failed to send magic link. Try again.";
+    }
   };
 </script>
-
 </body>
 </html>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+<style>
+body { font-family: Arial, sans-serif; background: #f0f4f8; margin: 0; padding: 0; }
+header { background: #007BFF; color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+header button { background: white; color: #007BFF; border: none; padding: 0.5rem 1rem; cursor: pointer; border-radius: 5px; font-weight: bold; }
+
+main { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+
+.navbar { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.navbar button { padding: 0.5rem 1rem; border: none; border-radius: 5px; cursor: pointer; background: #ddd; font-weight: bold; }
+.navbar button.active { background: #007BFF; color: white; }
+
+.requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: all 0.5s ease; /* smooth transition */
+}
+
+.request-card {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.request-card p { margin: 0.2rem 0; }
+button.status-btn { margin-right: 0.3rem; padding: 0.3rem 0.6rem; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+.accept { background: #28a745; color: white; }
+.reject { background: #dc3545; color: white; }
+.done { background: #ffc107; color: white; }
+.pending { background: #17a2b8; color: white; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Admin Dashboard</h1>
+  <button id="signoutBtn">Sign Out</button>
+</header>
+
+<main>
+  <h2 id="status">Checking authentication...</h2>
+
+  <!-- Navbar for filtering -->
+  <div class="navbar">
+    <button data-status="all" class="active">All</button>
+    <button data-status="pending">Pending</button>
+    <button data-status="in progress">In Progress</button>
+    <button data-status="done">Done</button>
+    <button data-status="rejected">Rejected</button>
+  </div>
+
+  <!-- Requests container -->
+  <div class="requests-list" id="requestsContainer"></div>
+</main>
+
+<script type="module">
+const client = new Appwrite.Client()
+    .setEndpoint("https://fra.cloud.appwrite.io/v1")
+    .setProject("69245280003e7f885796");
+
+const account = new Appwrite.Account(client);
+const databases = new Appwrite.Databases(client);
+const status = document.getElementById("status");
+const requestsContainer = document.getElementById("requestsContainer");
+const navbarButtons = document.querySelectorAll(".navbar button");
+
+let allRequests = [];
+let currentFilter = "all";
+
+// Sign out
+document.getElementById("signoutBtn").onclick = async () => {
+    try {
+        await account.deleteSession('current');
+        window.location.href = "/signup.html";
+    } catch (err) {
+        console.error(err);
+        alert("Error signing out.");
+    }
+};
+
+// Handle navbar filter clicks
+navbarButtons.forEach(btn => {
+    btn.onclick = () => {
+        navbarButtons.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentFilter = btn.dataset.status;
+        renderRequests();
+    };
+});
+
+async function authCheck() {
+    try {
+        const user = await account.get();
+        console.log("User logged in:", user);
+
+        const labels = user.labels || [];
+        if (!labels.includes("admin")) {
+            window.location.href = "/index.html";
+            return;
+        }
+
+        status.innerText = `Welcome Admin, ${user.name || user.email}!`;
+
+        await loadRequests();
+
+    } catch (err) {
+        console.log("No active session:", err);
+        window.location.href = "/signup.html";
+    }
+}
+
+async function loadRequests() {
+    try {
+        const res = await databases.listDocuments(
+            '6925b17c003e4e83b77b', 
+            'requests',             
+            [],
+            100
+        );
+
+        allRequests = res.documents;
+        renderRequests();
+
+    } catch (err) {
+        console.error("Error loading requests:", err);
+        requestsContainer.innerHTML = "<p>Error loading requests. Check console.</p>";
+    }
+}
+
+function renderRequests() {
+    requestsContainer.innerHTML = "";
+
+    // Assign an order for flex items: "in progress" = 0, others = 1
+    const sortedRequests = [...allRequests];
+
+    sortedRequests.forEach(doc => {
+        const card = document.createElement("div");
+        card.className = "request-card";
+
+        const statusLabel = doc.status || "pending";
+
+        // Set flex order to push "in progress" on top
+        card.style.order = statusLabel === "in progress" ? 0 : 1;
+
+        card.innerHTML = `
+            <p><b>${doc.name}</b> | Status: ${statusLabel}</p>
+            <p>Phone: ${doc.phoneNumber}</p>
+            <p>Address: ${doc.address}</p>
+            <p>${doc.des}</p>
+        `;
+
+        // Buttons logic
+        if(statusLabel === "pending") {
+            const acceptBtn = document.createElement("button");
+            acceptBtn.className = "status-btn accept";
+            acceptBtn.innerText = "Accept";
+            acceptBtn.onclick = () => updateStatus(doc.$id, "in progress");
+
+            const rejectBtn = document.createElement("button");
+            rejectBtn.className = "status-btn reject";
+            rejectBtn.innerText = "Reject";
+            rejectBtn.onclick = () => updateStatus(doc.$id, "rejected");
+
+            card.append(acceptBtn, rejectBtn);
+
+        } else if(statusLabel === "in progress") {
+            const pendingBtn = document.createElement("button");
+            pendingBtn.className = "status-btn pending";
+            pendingBtn.innerText = "Pending";
+            pendingBtn.onclick = () => updateStatus(doc.$id, "pending");
+
+            const rejectBtn = document.createElement("button");
+            rejectBtn.className = "status-btn reject";
+            rejectBtn.innerText = "Reject";
+            rejectBtn.onclick = () => updateStatus(doc.$id, "rejected");
+
+            card.append(pendingBtn, rejectBtn);
+        }
+
+        // done / rejected → no buttons
+
+        requestsContainer.appendChild(card);
+    });
+}
+
+
+
+async function updateStatus(docId, newStatus){
+    try {
+        await databases.updateDocument(
+            '6925b17c003e4e83b77b', 
+            'requests',             
+            docId,
+            { status: newStatus }
+        );
+        await loadRequests(); 
+    } catch(err){
+        console.error("Error updating status:", err);
+        alert("Error updating status. Check console.");
+    }
+}
+
+authCheck();
+</script>
+</body>
+</html>
